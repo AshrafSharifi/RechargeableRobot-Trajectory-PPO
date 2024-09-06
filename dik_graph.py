@@ -106,6 +106,6 @@ for source, target_dict in shortest_paths.items():
             print(f"Shortest path from {source} to {target} is {path} with distance {distance}")
             plotgraph(graph_data,pos, source, path)
 
-# Write the data to a JSON file
-with open('data/shortest_paths.json', 'w') as f:
-    json.dump(shortest_paths_data, f, indent=4)
+# # Write the data to a JSON file
+# with open('data/shortest_paths.json', 'w') as f:
+#     json.dump(shortest_paths_data, f, indent=4)

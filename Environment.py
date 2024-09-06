@@ -23,8 +23,8 @@ class Environment:
         self.max_time = 90
         self.mean_time = np.mean(travel_times)
         self.std_time = np.std(travel_times)
-        self.temperature_weight = .6  # Weight for maximizing temperature change
-        self.time_weight = .4  # Weight for minimizing time
+        self.temperature_weight = 3 # Weight for maximizing temperature change
+        self.time_weight = 1  # Weight for minimizing time
         # self.process_penalty = 0.5*(self.process_time / 60)
         self.process_penalty = 0.5*(self.process_time / 60)
         # self.process_penalty = self.process_time
@@ -104,7 +104,32 @@ class Environment:
     def step(self,state,action,his_trajectory=None,is_visited=0,time_offset=0):
         state = state.cpu().numpy().astype(int)[0]
         current_sensor = state[0]
-        action = int(action) 
+        primary_action = action
+        res = []
+        # for act in range(1,8):
+        #     if act != state[0]:
+        #         action = act
+        #         current_hour = state[4] 
+        #         current_minute = state[5]
+        #         reach_time = self.reach_time["sensor"+str(current_sensor)]
+        #         Flag = False
+        #         if current_sensor == action:
+        #             new_state = state
+        #         else:
+        #             reach_to_next_time = reach_time[str(current_sensor)+'_'+str(action)]+time_offset
+        #             self.reach_time_minutes = reach_to_next_time-time_offset
+        #             base_time = str(current_hour)+':'+str(current_minute)+':00'
+        #             next_hour, next_min, Flag = self.func.add_minutes(base_time, reach_to_next_time+(is_visited*self.process_time) )
+        #             new_state = [action,state[1],state[2],state[3],next_hour,next_min]
+        #         reward,temperature_difference,reach_time_minutes,his_trajectory = self.calculate_reward(state, new_state,his_trajectory)  # Calculate the reward
+        #         res.append([act,reward,temperature_difference,reach_time_minutes])
+            
+        
+        
+        action = int(primary_action) 
+        # print(max(res, key=lambda x: x[1]))
+        # print(primary_action)
+
         current_hour = state[4] 
         current_minute = state[5]
         reach_time = self.reach_time["sensor"+str(current_sensor)]
@@ -118,6 +143,7 @@ class Environment:
             next_hour, next_min, Flag = self.func.add_minutes(base_time, reach_to_next_time+(is_visited*self.process_time) )
             new_state = [action,state[1],state[2],state[3],next_hour,next_min]
         reward,temperature_difference,reach_time_minutes,his_trajectory = self.calculate_reward(state, new_state,his_trajectory)  # Calculate the reward
+    
         his_trajectory,_ = self.update_his_trajectory(state, his_trajectory)
         return new_state, Flag,reward,temperature_difference,reach_time_minutes,his_trajectory
         
@@ -229,12 +255,12 @@ class Environment:
                 temperature_change1 = abs(next_temperature - temperature)
             except:
                 print('w')
-            time_factor = self.reach_time_minutes
+            time_factor = self.normalize_time(self.reach_time_minutes)
             self.process_penalty = 15
         
             # temperature_change1 = abs(self.normalize_temperature(next_temperature) - self.normalize_temperature(temperature))
             # time_factor = abs((self.reach_time_minutes - self.min_time) / (self.max_time - self.min_time))   
-            reward = (self.temperature_weight * temperature_change1) - (self.time_weight * time_factor) - self.process_penalty
+            reward = (self.temperature_weight * temperature_change1) - (self.time_weight * time_factor) #- self.process_penalty
             return reward,temperature_change1,self.reach_time_minutes,his_trajectory
 
     def extract_history_traj(self,current_state):

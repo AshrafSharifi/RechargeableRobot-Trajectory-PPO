@@ -17,6 +17,8 @@ from datetime import datetime
 @dataclass
 class Args:
     
+    actor_std :float = 0.5
+    critic_std :float = 0.5
     train_mode : bool = True
     
     train_Forall : bool = False
@@ -42,13 +44,13 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "Field_Temp"
     """the id of the environment"""
-    total_timesteps: int = 10000
+    total_timesteps: int = 50000
     """total timesteps of the experiments"""
-    learning_rate: float = 1e-3
+    learning_rate: float = 0.001
     """the learning rate of the optimizer"""
     num_envs: int = 1
     """the number of parallel game environments"""
-    num_steps: int = 26
+    num_steps: int = 300
     """the number of steps to run in each environment per policy rollout"""
     anneal_lr: bool = False
     """Toggle learning rate annealing for policy and value networks"""
@@ -56,21 +58,21 @@ class Args:
     """the discount factor gamma"""
     gae_lambda: float = 0.95
     """the lambda for the general advantage estimation"""
-    num_minibatches: int = 10
+    num_minibatches: int = 5
     """the number of mini-batches"""
-    update_epochs: int = 10
+    update_epochs: int = 4
     """the K epochs to update the policy"""
-    norm_adv: bool = True
+    norm_adv: bool = False
     """Toggles advantages normalization"""
     clip_coef: float = 0.2
     """the surrogate clipping coefficient"""
-    clip_vloss: bool = False
+    clip_vloss: bool = True
     """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
-    ent_coef: float = 0.00
+    ent_coef: float = 0.2
     """coefficient of the entropy"""
-    vf_coef: float = 0.5
+    vf_coef: float = 0.1
     """coefficient of the value function"""
-    max_grad_norm: float = 0.5
+    max_grad_norm: float = 0.4
     """the maximum norm for the gradient clipping"""
     target_kl: object = None
     """the target KL divergence threshold"""
@@ -90,6 +92,8 @@ class Args:
     """Number of possible actions"""
     
     max_episode_length: int = 12
+    
+
 
 
 def make_env(env_id, idx, capture_video, run_name):
@@ -141,8 +145,8 @@ class Agent(nn.Module):
     
     def __init__(self, envs, args):
         super().__init__()
-        self.actor = self.Actor(x_dim=np.array(envs.state_dim).prod(), actor_layers=[32, 32], activation='tanh', u_dim=np.prod(args.action_options-1),std=.5)
-        self.critic = self.Critic(x_dim=np.array(envs.state_dim).prod(), critic_layers=[32, 16, 8], activation='tanh',std=0.01)
+        self.actor = self.Actor(x_dim=np.array(envs.state_dim).prod(), actor_layers=[128, 64], activation='tanh', u_dim=np.prod(args.action_options-1),std=args.actor_std)
+        self.critic = self.Critic(x_dim=np.array(envs.state_dim).prod(), critic_layers=[32, 16, 8], activation='tanh',std=args.critic_std)
         
         
             
@@ -273,7 +277,7 @@ class Agent(nn.Module):
     #         return None, None, None, None
 
 
-def train(args=None,path=None,state_dict = None,train_for_all=False):
+def train(args=None,path=None,run_name=None,state_dict = None,train_for_all=False):
     
     retain_graph=False
     CUDA_LAUNCH_BLOCKING=1
@@ -283,6 +287,7 @@ def train(args=None,path=None,state_dict = None,train_for_all=False):
     print("batch_size: " + str(args.batch_size))
     print("minibatch_size: " + str(args.minibatch_size))
     print("num_iterations: " + str(args.num_iterations))
+    comulative_reward_array = []
 
     
     writer = SummaryWriter(path)
@@ -347,7 +352,7 @@ def train(args=None,path=None,state_dict = None,train_for_all=False):
             frac = 1.0 - (iteration - 1.0) / args.num_iterations
             lrnow = frac * args.learning_rate
             optimizer.param_groups[0]["lr"] = lrnow
-        traj_step = 0
+        
         for step in range(0, args.num_steps):
             global_step += args.num_envs
             obs[step] = next_obs
@@ -375,18 +380,21 @@ def train(args=None,path=None,state_dict = None,train_for_all=False):
             
             # next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy())
             # next_done = np.logical_or(terminations, truncations)
-            traj_rewards[traj_step] = reward
-            traj_step += 1
+            
             rewards[step] = torch.tensor(reward).to(device).view(-1)
+            
+            
+
+
             # next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
             
-            if step >= args.max_episode_length:
-                next_done = torch.Tensor([1]).to(device) 
-                comulative_reward = sum(traj_rewards).item()
-                traj_step = 0
-                print(f"global_step={global_step}, episodic_return={comulative_reward}")
-                writer.add_scalar("charts/episodic_return", comulative_reward, global_step)
-                # writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
+            # if step >= args.max_episode_length:
+            #     next_done = torch.Tensor([1]).to(device) 
+            #     comulative_reward = sum(traj_rewards).item()
+            #     traj_step = 0
+            #     print(f"global_step={global_step}, episodic_return={comulative_reward}")
+            #     writer.add_scalar("charts/episodic_return", comulative_reward, global_step)
+            #     # writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
 
 
         # bootstrap value if not done
@@ -394,8 +402,8 @@ def train(args=None,path=None,state_dict = None,train_for_all=False):
             next_value = agent.get_value(next_obs).reshape(1, -1)
             advantages = torch.zeros_like(rewards).to(device)
             lastgaelam = 0
-            for t in reversed(range(args.num_steps-1)):
-                if t == args.max_episode_length:
+            for t in reversed(range(args.num_steps)):
+                if t == args.num_steps - 1:
                     nextnonterminal = 1.0 - next_done
                     nextvalues = next_value
                 else:
@@ -416,6 +424,7 @@ def train(args=None,path=None,state_dict = None,train_for_all=False):
         # Optimizing the policy and value network
         b_inds = np.arange(args.batch_size)
         clipfracs = []
+        
         for epoch in range(args.update_epochs):
             np.random.shuffle(b_inds)
             for start in range(0, args.batch_size, args.minibatch_size):
@@ -440,7 +449,7 @@ def train(args=None,path=None,state_dict = None,train_for_all=False):
                 pg_loss1 = -mb_advantages * ratio
                 pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
                 pg_loss = torch.max(pg_loss1, pg_loss2).mean()
-                # print(pg_loss1,pg_loss2,pg_loss)
+
                 # Value loss
                 newvalue = newvalue.view(-1)
                 if args.clip_vloss:
@@ -453,45 +462,57 @@ def train(args=None,path=None,state_dict = None,train_for_all=False):
                     v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
                     v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
                     v_loss = 0.5 * v_loss_max.mean()
-                    # print(v_loss)
                 else:
                     v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
-                    # print(v_loss)
 
                 entropy_loss = entropy.mean()
                 loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
-                # print(loss)
-                if loss > 1e9 or torch.isnan(loss).any():
-                    print(loss)
 
                 optimizer.zero_grad()
                 loss.backward()
                 nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm)
                 optimizer.step()
-
             if args.target_kl is not None and approx_kl > args.target_kl:
                 break
+                
+        
 
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
         explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+        
+        
+        
+        comulative_reward = sum(rewards).item()
+        comulative_reward_array.append(comulative_reward)
 
         # TRY NOT TO MODIFY: record rewards for plotting purposes
         writer.add_scalar("charts/learning_rate", optimizer.param_groups[0]["lr"], global_step)
+        writer.add_scalar("charts/comulative_reward", comulative_reward, global_step)
         writer.add_scalar("losses/value_loss", v_loss.item(), global_step)
         writer.add_scalar("losses/policy_loss", pg_loss.item(), global_step)
         writer.add_scalar("losses/entropy", entropy_loss.item(), global_step)
-        writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), global_step)
-        writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
-        writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
-        writer.add_scalar("losses/explained_variance", explained_var, global_step)
-        print("SPS:", int(iteration),"/", int(args.num_iterations))
-        writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
+        # writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), global_step)
+        # writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
+        # writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
+        # writer.add_scalar("losses/explained_variance", explained_var, global_step)
         
+        
+        
+        print("SPS:", int(iteration),"/", int(args.num_iterations),"   Comulative Rewards:", comulative_reward)
+       
+    
+    # Plotting
+    # Plotting the cumulative reward
+    # plt.plot(comulative_reward_array)
+    # plt.xlabel('Episode')
+    # plt.ylabel('Cumulative Reward')
+    # plt.title('Cumulative Reward over Time')
+    # plt.grid(True)
+    # plt.show()
+
     if args.save_model:
-        model_path = path+f"/{args.exp_name}.cleanrl_model"
-        if not os.path.exists(model_path):
-            os.makedirs(model_path)
+        model_path = path+"/model.cleanrl_model"
         torch.save(agent.state_dict(), model_path)
         print(f"model saved to {model_path}")
     # envs.close()
@@ -694,12 +715,16 @@ if __name__ == "__main__":
         path = f"runs/{run_name}"
         train(args,path,states_dict,True)
     elif args.train_mode:
-        current_datetime = datetime.now()
-        formatted_datetime = current_datetime.strftime("%Y_%m_%d__%H-%M")
-        run_name = f"{args.env_id}__{args.exp_name}__{formatted_datetime}"
-        path = f"runs/{run_name}"
-        train(args,path)
+        
+        for args.actor_std in [.5]:
+            for args.critic_std in [.5]:
+                current_datetime = datetime.now()
+                formatted_datetime = current_datetime.strftime("%H%M")
+                run_name = f"{formatted_datetime}"
+                path = f"runs/{run_name}"
+                print(args.actor_std,args.critic_std)
+                train(args,path,run_name)
     else:
-        model_path = 'runs/total_train__Field_Temp__ppo_agent__2024_02_27__23-51/ppo_agent.cleanrl_model'
+        model_path = 'runs/1302/model.cleanrl_model'
         test(args,model_path)
     
