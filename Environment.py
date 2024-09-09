@@ -7,15 +7,17 @@ from tensorflow.keras.optimizers import Adam
 from functions import *
 from tabulate import tabulate
 from keras.layers import BatchNormalization
+from variables import variables
+
 class Environment:
     def __init__(self , env_id):
         self.env_id : int  = 0
         self.POIs = [1,2,4,6,7,5,3]
         travel_times = [15,30,45,60,75,90]
         self.func= functions()
-        self.reach_time = self.func.time_to_reach_POI()
+        # self.reach_time = self.func.time_to_reach_POI()
         self.process_time = 15
-        self.state_dim = 6
+        self.state_dim = 8
         self.action_dim = 1  
         self.min_temp = 0
         self.max_temp = 0
@@ -25,6 +27,7 @@ class Environment:
         self.std_time = np.std(travel_times)
         self.temperature_weight = 3 # Weight for maximizing temperature change
         self.time_weight = 1  # Weight for minimizing time
+        self.charging_weight = 1
         # self.process_penalty = 0.5*(self.process_time / 60)
         self.process_penalty = 0.5*(self.process_time / 60)
         # self.process_penalty = self.process_time
@@ -36,6 +39,7 @@ class Environment:
         data = self.func.get_all_data()
         self.sensorsdata= data
         self.reach_time_minutes = 0
+        self.var_obj = variables()
    
     def get_previous_key(self,circular_dict, current_key):
         keys = list(circular_dict.keys())
@@ -49,7 +53,7 @@ class Environment:
         key = list(self.states_dict.keys())[0]
         [y,m] = key.split('_')
         d = (self.states_dict[key])[0]
-        initial_state = [1 ,int(y), int(m), d, 0, 0]
+        initial_state = [1 ,int(y), int(m), d, 0, 0,self.var_obj.initialChargingLevel,self.var_obj.shortest_paths_data['1']['dis_to_charging_station']]
         return initial_state
         
     def get_min_max_temp(self,state=None):        
@@ -119,10 +123,12 @@ class Environment:
         #             reach_to_next_time = reach_time[str(current_sensor)+'_'+str(action)]+time_offset
         #             self.reach_time_minutes = reach_to_next_time-time_offset
         #             base_time = str(current_hour)+':'+str(current_minute)+':00'
-        #             next_hour, next_min, Flag = self.func.add_minutes(base_time, reach_to_next_time+(is_visited*self.process_time) )
-        #             new_state = [action,state[1],state[2],state[3],next_hour,next_min]
+        #             next_hour, next_min, Flag = self.func.add_minutes(base_time, reach_to_next_time+(is_visited*self.process_time))
+        #             next_charge_level = state[6]-reach_to_next_time
+        #             dis_to_charging_station = self.var_obj.shortest_paths_data[str(act)]['dis_to_charging_station']
+        #             new_state = [action,state[1],state[2],state[3],next_hour,next_min,next_charge_level,dis_to_charging_station]
         #         reward,temperature_difference,reach_time_minutes,his_trajectory = self.calculate_reward(state, new_state,his_trajectory)  # Calculate the reward
-        #         res.append([act,reward,temperature_difference,reach_time_minutes])
+        #         res.append([act,reward,temperature_difference,reach_time_minutes,next_charge_level,dis_to_charging_station])
             
         
         
@@ -132,16 +138,18 @@ class Environment:
 
         current_hour = state[4] 
         current_minute = state[5]
-        reach_time = self.reach_time["sensor"+str(current_sensor)]
         Flag = False
         if current_sensor == action:
            new_state = state
         else:
-            reach_to_next_time = reach_time[str(current_sensor)+'_'+str(action)]+time_offset
+            # reach_to_next_time = reach_time[str(current_sensor)+'_'+str(action)]+time_offset
+            reach_to_next_time = self.var_obj.shortest_paths_data[str(current_sensor)][str(action)]['distance']+time_offset
             self.reach_time_minutes = reach_to_next_time-time_offset
             base_time = str(current_hour)+':'+str(current_minute)+':00'
-            next_hour, next_min, Flag = self.func.add_minutes(base_time, reach_to_next_time+(is_visited*self.process_time) )
-            new_state = [action,state[1],state[2],state[3],next_hour,next_min]
+            next_hour, next_min, Flag = self.func.add_minutes(base_time, reach_to_next_time+(is_visited*self.process_time))
+            next_charge_level = state[6]-reach_to_next_time-self.process_time
+            dis_to_charging_station = self.var_obj.shortest_paths_data[str(action)]['dis_to_charging_station']
+            new_state = [action,state[1],state[2],state[3],next_hour,next_min,next_charge_level,dis_to_charging_station]
         reward,temperature_difference,reach_time_minutes,his_trajectory = self.calculate_reward(state, new_state,his_trajectory)  # Calculate the reward
     
         his_trajectory,_ = self.update_his_trajectory(state, his_trajectory)
@@ -239,28 +247,37 @@ class Environment:
     def normalize_time(self,time):
         time_anomalies = time - self.mean_time
         normalized_time = time_anomalies / self.std_time
-        return normalized_time
+        return abs(normalized_time)
 
     def calculate_reward(self,state, next_state,his_trajectory):
-        
-       
+        reward= 0
         if next_state[0]== state[0]:
             return -1000,0,90,his_trajectory
-        else:   
+        else:
+            if (next_state[7] > next_state[6] or next_state[6]==0) and next_state[7]!=0:
+                return -10,None,None,his_trajectory
+            
+            elif (next_state[7] > next_state[6] or next_state[6]==0) and next_state[7]==0:
+                reward = 10
+                next_state[6] = self.var_obj.initialChargingLevel
+        
+
     
             his_trajectory,temperature = self.update_his_trajectory(next_state,his_trajectory)        
             # Calculate the temperature change from current to next state
             next_temperature = self.get_current_temp(next_state)
-            try:
-                temperature_change1 = abs(next_temperature - temperature)
-            except:
-                print('w')
+           
+            temperature_change1 = abs(next_temperature - temperature)
+            
             time_factor = self.normalize_time(self.reach_time_minutes)
             self.process_penalty = 15
         
             # temperature_change1 = abs(self.normalize_temperature(next_temperature) - self.normalize_temperature(temperature))
             # time_factor = abs((self.reach_time_minutes - self.min_time) / (self.max_time - self.min_time))   
-            reward = (self.temperature_weight * temperature_change1) - (self.time_weight * time_factor) #- self.process_penalty
+            
+            # check wether charging level in new position is enough to reach to nearest charging station or not
+            if reward!= 10:
+                reward = (self.temperature_weight * temperature_change1) - (self.time_weight * time_factor) - (self.charging_weight * time_factor) #- self.process_penalty
             return reward,temperature_change1,self.reach_time_minutes,his_trajectory
 
     def extract_history_traj(self,current_state):
@@ -269,6 +286,8 @@ class Environment:
         
         history_path = dict()
         initial_sensor = int(current_state[0])
+        charging_level = current_state[6]
+        dis_to_charging_station = current_state[7]
         
         while initial_sensor != next_sensor:
             current_sensor = int(current_state[0])
@@ -277,12 +296,13 @@ class Environment:
             base_time = str(int(current_state[4])) + ':' + str(int(current_state[5]))+ ':00'
             next_hour, next_min, Flag = self.func.add_minutes(base_time, 15)
             next_sensor = self.find_next_item(current_sensor)
-            current_state = np.array([int(next_sensor), int(current_state[1]), int(current_state[2]), int(current_state[3]), next_hour, next_min])
+            current_state = np.array([int(next_sensor), int(current_state[1]), int(current_state[2]), int(current_state[3]), next_hour, next_min, self.var_obj.initialChargingLevel,self.var_obj.shortest_paths_data[str(next_sensor)]['dis_to_charging_station']])
         
         # Custom sorting key based on day, hour, and minutes
         def sorting_key(item):
             return tuple(item[0][2:5])
         
+
         # Sort the dictionary based on the custom key
         his_trajectory = dict(sorted(history_path.items(), key=lambda x: sorting_key(x[1])))
         last_item = list(his_trajectory.values())[-1]
@@ -290,7 +310,7 @@ class Environment:
         base_time = str(current_state[4]) + ':' + str(current_state[5]) + ':00'
         next_hour, next_min, Flag = self.func.add_minutes(base_time, 15)
         next_sensor = self.find_next_item(current_state[0])
-        current_state = np.array([int(next_sensor), int(current_state[1]), int(current_state[2]), int(current_state[3]), next_hour, next_min])
+        current_state = np.array([int(next_sensor), int(current_state[1]), int(current_state[2]), int(current_state[3]), next_hour, next_min,charging_level,dis_to_charging_station])
 
         return history_path,np.reshape(current_state, [1, self.state_dim])
     

@@ -13,15 +13,16 @@ from torch.distributions.categorical import Categorical
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 from datetime import datetime
+from variables import variables
 
 @dataclass
 class Args:
     
-    actor_std :float = 0.5
-    critic_std :float = 0.5
-    train_mode : bool = True
+    actor_std :float = 0.01
+    critic_std :float = .9
+    train_mode : bool = False
     
-    train_Forall : bool = False
+    train_Forall : bool = False 
     
     threshold_diff: int =1
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
@@ -44,35 +45,35 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "Field_Temp"
     """the id of the environment"""
-    total_timesteps: int = 50000
+    total_timesteps: int = 100000
     """total timesteps of the experiments"""
-    learning_rate: float = 0.001
+    learning_rate: float = 2.5e-4
     """the learning rate of the optimizer"""
     num_envs: int = 1
     """the number of parallel game environments"""
-    num_steps: int = 300
+    num_steps: int = 128
     """the number of steps to run in each environment per policy rollout"""
-    anneal_lr: bool = False
+    anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
     gamma: float = 0.99
     """the discount factor gamma"""
     gae_lambda: float = 0.95
     """the lambda for the general advantage estimation"""
-    num_minibatches: int = 5
+    num_minibatches: int = 4
     """the number of mini-batches"""
     update_epochs: int = 4
     """the K epochs to update the policy"""
-    norm_adv: bool = False
+    norm_adv: bool = True
     """Toggles advantages normalization"""
-    clip_coef: float = 0.2
+    clip_coef: float = 0.1
     """the surrogate clipping coefficient"""
     clip_vloss: bool = True
     """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
-    ent_coef: float = 0.2
+    ent_coef: float = 0.01
     """coefficient of the entropy"""
-    vf_coef: float = 0.1
+    vf_coef: float = 0.5
     """coefficient of the value function"""
-    max_grad_norm: float = 0.4
+    max_grad_norm: float = 0.5
     """the maximum norm for the gradient clipping"""
     target_kl: object = None
     """the target KL divergence threshold"""
@@ -86,7 +87,7 @@ class Args:
     num_iterations: int = 0
     """the number of iterations (computed in runtime)"""
     
-    state_dim : int = 6
+    state_dim : int = 8
     """Dimension of the state"""
     action_options : int =7
     """Number of possible actions"""
@@ -145,8 +146,8 @@ class Agent(nn.Module):
     
     def __init__(self, envs, args):
         super().__init__()
-        self.actor = self.Actor(x_dim=np.array(envs.state_dim).prod(), actor_layers=[128, 64], activation='tanh', u_dim=np.prod(args.action_options-1),std=args.actor_std)
-        self.critic = self.Critic(x_dim=np.array(envs.state_dim).prod(), critic_layers=[32, 16, 8], activation='tanh',std=args.critic_std)
+        self.actor = self.Actor(x_dim=np.array(envs.state_dim).prod(), actor_layers=[128, 64], activation='relu', u_dim=np.prod(args.action_options-1),std=args.actor_std)
+        self.critic = self.Critic(x_dim=np.array(envs.state_dim).prod(), critic_layers=[32, 16, 8], activation='relu',std=args.critic_std)
         
         
             
@@ -288,6 +289,9 @@ def train(args=None,path=None,run_name=None,state_dict = None,train_for_all=Fals
     print("minibatch_size: " + str(args.minibatch_size))
     print("num_iterations: " + str(args.num_iterations))
     comulative_reward_array = []
+    varobj = variables()
+    
+
 
     
     writer = SummaryWriter(path)
@@ -305,7 +309,7 @@ def train(args=None,path=None,run_name=None,state_dict = None,train_for_all=Fals
 
     envs = Environment(args.env_id)
     agent = Agent(envs, args).to(device)
-    optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-8)
+    optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
        
     # ALGO Logic: Storage setup
     obs = torch.zeros((args.num_steps, args.num_envs) + (envs.state_dim,)).to(device)
@@ -345,7 +349,7 @@ def train(args=None,path=None,run_name=None,state_dict = None,train_for_all=Fals
         next_obs = torch.Tensor(initial_state).to(device)    
         envs.get_min_max_temp(next_obs)
         next_done = torch.zeros(args.num_envs).to(device)
-        traj_rewards = torch.zeros((args.max_episode_length+1, args.num_envs)).to(device)
+        # traj_rewards = torch.zeros((args.max_episode_length+1, args.num_envs)).to(device)
         initial_his_trajectory = his_trajectory.copy()
         # Annealing the rate if instructed to do so.
         if args.anneal_lr:
@@ -517,9 +521,70 @@ def train(args=None,path=None,run_name=None,state_dict = None,train_for_all=Fals
         print(f"model saved to {model_path}")
     # envs.close()
     writer.close()
+
+def test(args, model_path):
+    # Set the random seed for reproducibility
+    args.seed = 1
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.backends.cudnn.deterministic = args.torch_deterministic
+    device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+    
+    # Initialize environment
+    envs = Environment(args.env_id)
+    envs.get_min_max_temp()
+    state = envs.reset()
+    state = np.array([state])
+    initial_day = int(state[0, 3])
+    
+    # Initialize agent
+    agent = Agent(envs, args).to(device)
+    agent.load_state_dict(torch.load(model_path, map_location=device))
+    # Load the saved model
+    # state_dict = torch.load(model_path, map_location=device)
+    # agent.load_state_dict(state_dict)
+    
+    # Set the agent components in evaluation mode
+    agent.eval()
+
+    varobj = variables()
+    varobj.plotgraph()
+
     
 
-def test(args,model_path):
+    temp = envs.get_current_temp(state[0])
+    visited_sensor = str(state[0, 0])
+
+    his_trajectory, state = envs.extract_history_traj(state[0])
+    his_trajectory[visited_sensor][0] = np.array(state[0])
+    his_trajectory[visited_sensor][1] = temp
+
+    finish = False
+    num_of_visited_POIs = 0
+    time_offset = 15
+
+    while not finish:
+        
+        action, _, _, _ = agent.get_action_and_value(torch.Tensor(state).to(device))
+        # Execute the action
+        next_state, Flag, reward, temperature_difference, reach_time_minutes, his_trajectory = envs.step(torch.Tensor(state), action, his_trajectory.copy(), 0, time_offset)
+        next_state = np.reshape(next_state, [1, envs.state_dim])
+
+        s_path = varobj.shortest_paths_data[str(state[0][0])][str(next_state[0][0])]['path']
+        battery_level = next_state[0][6]
+        date_time = varobj.extract_date_time(next_state)
+        varobj.plotgraph(s_path[0], s_path, battery_level, round(reward, 2), round(temperature_difference, 2),date_time)
+        
+        if Flag:
+            finish = True
+            next_state[0][3] = next_state[0][3] + 1
+        state = next_state
+        
+        
+
+
+def test_basic(args,model_path):
     args.seed = 1
     envs = Environment(args.env_id)
     envs.get_min_max_temp()
@@ -539,59 +604,71 @@ def test(args,model_path):
 
 
     loaded_model=agent.actor
-    
+    varobj = variables()
     
     path = {
-        "1": ["NotVisited", 1, 0, 0, 0, np.empty((0, 0)),0],    #POI number: ['status','priority(based on article)'
-        "2": ["NotVisited", 2, 0, 0, 0, np.empty((0, 0)),0],    #             'reward','temp difference', 'time to reach', state
-        "4": ["NotVisited", 3, 0, 0, 0, np.empty((0, 0)),0],    #             'temperature']
-        "6": ["NotVisited", 4, 0, 0, 0, np.empty((0, 0)),0],
-        "7": ["NotVisited", 5, 0, 0, 0, np.empty((0, 0)),0],
-        "5": ["NotVisited", 6, 0, 0, 0, np.empty((0, 0)),0],
-        "3": ["NotVisited", 7, 0, 0, 0, np.empty((0, 0)),0]
+        "1": ["NotVisited", 1, 0, 0, 0, np.empty((0, 0)),0,0,varobj.shortest_paths_data['1']['dis_to_charging_station']],    #POI number: ['status','priority(based on article)'
+        "2": ["NotVisited", 2, 0, 0, 0, np.empty((0, 0)),0,0,varobj.shortest_paths_data['2']['dis_to_charging_station']],    #             'reward','temp difference', 'time to reach', state
+        "4": ["NotVisited", 3, 0, 0, 0, np.empty((0, 0)),0,0,varobj.shortest_paths_data['3']['dis_to_charging_station']],    #             'temperature','charge level', 'distance to nearest charging station']
+        "6": ["NotVisited", 4, 0, 0, 0, np.empty((0, 0)),0,0,varobj.shortest_paths_data['4']['dis_to_charging_station']],
+        "7": ["NotVisited", 5, 0, 0, 0, np.empty((0, 0)),0,0,varobj.shortest_paths_data['5']['dis_to_charging_station']],
+        "5": ["NotVisited", 6, 0, 0, 0, np.empty((0, 0)),0,0,varobj.shortest_paths_data['6']['dis_to_charging_station']],
+        "3": ["NotVisited", 7, 0, 0, 0, np.empty((0, 0)),0,0,varobj.shortest_paths_data['7']['dis_to_charging_station']]
            }
     
     
     # flag for reward of first item
     control_flag = False
-    # compute reward & temperature difference for the k first items of path
-    last_elemnt_his = list(his_trajectory.items())[-1][1][0]
-    first_three_items = {k: his_trajectory[k] for i, k in enumerate(his_trajectory) if i < 2}
-    temp_rewards= dict()
-    for key, value in first_three_items.items():
-        temp_st = value[0]
-        temp_new_state, temp_Flag,temp_reward,temp_temperature_difference,temp_reach_time_minutes,temp_his_trajectory = envs.step(torch.Tensor([last_elemnt_his]),value[0][0],his_trajectory.copy())
-        temp_rewards[key] = [temp_reward,temp_temperature_difference,temp_new_state,temp_temperature_difference,temp_reach_time_minutes]
-        if temp_temperature_difference > args.threshold_diff:
-            break
+    # # compute reward & temperature difference for the k first items of path
+    # last_elemnt_his = list(his_trajectory.items())[-1][1][0]
+    # first_three_items = {k: his_trajectory[k] for i, k in enumerate(his_trajectory) if i < 3}
+    # temp_rewards= dict()
+    
+    # for key, value in first_three_items.items():
+    #         temp_st = value[0]
+    #         temp_new_state, temp_Flag,temp_reward,temp_temperature_difference,temp_reach_time_minutes,temp_his_trajectory = envs.step(torch.Tensor([last_elemnt_his]),value[0][0],his_trajectory.copy())
+    #         temp_rewards[key] = [temp_reward,temp_temperature_difference,temp_new_state,temp_temperature_difference,temp_reach_time_minutes]
+    #         if temp_temperature_difference > args.threshold_diff:
+    #             break
 
     
 
-    max_index, max_item = max(enumerate(temp_rewards.items()), key=lambda x: x[1][1][0])
-    # max_item ('4', [6.3449999999999935, 1.3739999999999988, [4, 2021, 8, 27, 2, 15], 1.3739999999999988, 45])
-    temp_initial = state.copy()
-    state = np.array([max_item[1][2]])
+    # max_index, max_item = max(enumerate(temp_rewards.items()), key=lambda x: x[1][1][0])
+    # # max_item ('4', [6.3449999999999935, 1.3739999999999988, [4, 2021, 8, 27, 2, 15], 1.3739999999999988, 45])
+    # temp_initial = state.copy()
+    # state = np.array([max_item[1][2]])
+    # temp = envs.get_current_temp(state[0])
+    # visited_sensor = str(state[0,0])
+    # path[visited_sensor][0] = 'Visited' 
+    # path[visited_sensor][2] =  max_item[1][0] #reward
+    # path[visited_sensor][3] =  max_item[1][3] #temp difference
+    # path[visited_sensor][4] = max_item[1][4]  #time to reach
+    # path[visited_sensor][5] = np.array([max_item[1][2]]) #state
+    # path[visited_sensor][6] = temp #temperature
+    
+    
     temp = envs.get_current_temp(state[0])
     visited_sensor = str(state[0,0])
     path[visited_sensor][0] = 'Visited' 
-    path[visited_sensor][2] =  max_item[1][0] #reward
-    path[visited_sensor][3] =  max_item[1][3] #temp difference
-    path[visited_sensor][4] = max_item[1][4]  #time to reach
-    path[visited_sensor][5] = np.array([max_item[1][2]]) #state
+    path[visited_sensor][2] =  -1 #reward
+    path[visited_sensor][3] =  -1 #temp difference
+    path[visited_sensor][4] = -1  #time to reach
+    path[visited_sensor][5] = state #state
     path[visited_sensor][6] = temp #temperature
+    path[visited_sensor][7] = varobj.initialChargingLevel #temperature
 
     his_trajectory[visited_sensor][0]=np.array(state[0])
     his_trajectory[visited_sensor][1]=temp
     
-    passed_key = list()
-    for key,value in temp_rewards.items():
-        if path[key][1] < path[visited_sensor][1]:
-            path[key][0] = 'Passed'
-            path[key][2] =  value[0] #reward
-            path[key][3] =  value[3] #temp difference
-            path[key][4] = value[4]  #time to reach
-            path[key][5] = np.array([value[2]]) #state
-            path[key][6] = envs.get_current_temp(path[key][5][0]) #temperature
+    # passed_key = list()
+    # for key,value in temp_rewards.items():
+    #     if path[key][1] < path[visited_sensor][1]:
+    #         path[key][0] = 'Passed'
+    #         path[key][2] =  value[0] #reward
+    #         path[key][3] =  value[3] #temp difference
+    #         path[key][4] = value[4]  #time to reach
+    #         path[key][5] = np.array([value[2]]) #state
+    #         path[key][6] = envs.get_current_temp(path[key][5][0]) #temperature
             
 
     finish = False
@@ -703,28 +780,28 @@ def test(args,model_path):
 
 if __name__ == "__main__":
     args = tyro.cli(Args)
-    
+    KMP_DUPLICATE_LIB_OK= True
     if args.train_Forall:
         fin_name = 'data/states_dict'
         with open(fin_name, 'rb') as fin:
             states_dict = pickle.load(fin)
         fin.close() 
         current_datetime = datetime.now()
-        formatted_datetime = current_datetime.strftime("%Y_%m_%d__%H-%M")
-        run_name = f"total_train__{args.env_id}__{args.exp_name}__{formatted_datetime}"
-        path = f"runs/{run_name}"
+        formatted_datetime = current_datetime.strftime("%H%M")
+        run_name = f"{formatted_datetime}"
+        path = f"runs/all_{run_name}"
         train(args,path,states_dict,True)
     elif args.train_mode:
         
-        for args.actor_std in [.5]:
-            for args.critic_std in [.5]:
-                current_datetime = datetime.now()
-                formatted_datetime = current_datetime.strftime("%H%M")
-                run_name = f"{formatted_datetime}"
-                path = f"runs/{run_name}"
-                print(args.actor_std,args.critic_std)
-                train(args,path,run_name)
+        # for args.actor_std in [.5]:
+        #     for args.critic_std in [.5]:
+        current_datetime = datetime.now()
+        formatted_datetime = current_datetime.strftime("%H%M")
+        run_name = f"{formatted_datetime}"
+        path = f"runs/{run_name}"
+        print(args.actor_std,args.critic_std)
+        train(args,path,run_name)
     else:
-        model_path = 'runs/1302/model.cleanrl_model'
+        model_path = 'runs/all_1250/model.cleanrl_model'
         test(args,model_path)
     

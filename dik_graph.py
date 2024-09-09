@@ -26,19 +26,19 @@ def plotgraph(graph_data,pos, source_node=0, path=None):
                            node_color=['pink' if n == source_node else 'green' if n in [3, 5, 7] else 'lightgreen' for n in G.nodes])
 
     # Draw the edges with different colors for each direction
-    nx.draw_networkx_edges(G, pos, edgelist=[(u, v) for u, v in G.edges if graph_data['edges'][(u, v)] == 15],
+    nx.draw_networkx_edges(G, pos, edgelist=[(u, v) for u, v in G.edges if graph_data['edges'][(u, v)] in [15,30]],
                            width=2, edge_color='red', arrowsize=20, connectionstyle="arc3")
 
-    nx.draw_networkx_edges(G, pos, edgelist=[(u, v) for u, v in G.edges if graph_data['edges'][(u, v)] == 25],
+    nx.draw_networkx_edges(G, pos, edgelist=[(u, v) for u, v in G.edges if graph_data['edges'][(u, v)] == 45],
                            width=2, edge_color='orange', arrowsize=20, connectionstyle="arc3")
 
-    nx.draw_networkx_edges(G, pos, edgelist=[(u, v) for u, v in G.edges if graph_data['edges'][(u, v)] == 35],
+    nx.draw_networkx_edges(G, pos, edgelist=[(u, v) for u, v in G.edges if graph_data['edges'][(u, v)] == 60],
                            width=2, edge_color='blue', arrowsize=20, connectionstyle="arc3")
 
     # Highlight the path
     if path:
         path_edges = list(zip(path, path[1:]))
-        nx.draw_networkx_edges(G, pos, edgelist=path_edges, width=4, edge_color='yellow', arrowsize=25, connectionstyle="arc3")
+        nx.draw_networkx_edges(G, pos, edgelist=path_edges, width=4, edge_color='yellow', arrowsize=30, connectionstyle="arc3")
         nx.draw_networkx_nodes(G, pos, nodelist=path, node_size=5000, node_color='yellow')
 
     # Add labels to the nodes
@@ -90,15 +90,15 @@ for source, target_dict in shortest_paths.items():
             }
             
             if source in charging_stations:
-                shortest_paths_data[source]['dis_to_charging_station']=0,
-                shortest_paths_data[source]['nearest_charging_station']=source,
+                shortest_paths_data[source]['dis_to_charging_station']=0
+                shortest_paths_data[source]['nearest_charging_station']=source
                 shortest_paths_data[source]['path_to_charging_station']=[source]
             else:
                 ch_dist = []
                 for ch in charging_stations:
                     ch_dist.append(shortest_paths_length[source][ch])
                 
-                nearest_charging_station = ch_dist.index(min(ch_dist))    
+                nearest_charging_station = ch_dist.index(min(ch_dist))  
                 shortest_paths_data[source]['dis_to_charging_station']=ch_dist[nearest_charging_station]
                 shortest_paths_data[source]['nearest_charging_station']=charging_stations[nearest_charging_station]
                 shortest_paths_data[source]['path_to_charging_station']=shortest_paths[source][charging_stations[nearest_charging_station]]
@@ -107,5 +107,5 @@ for source, target_dict in shortest_paths.items():
             plotgraph(graph_data,pos, source, path)
 
 # # Write the data to a JSON file
-# with open('data/shortest_paths.json', 'w') as f:
-#     json.dump(shortest_paths_data, f, indent=4)
+with open('data/shortest_paths.json', 'w') as f:
+    json.dump(shortest_paths_data, f, indent=4)
