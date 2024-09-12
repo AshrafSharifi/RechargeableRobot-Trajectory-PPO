@@ -802,6 +802,6 @@ if __name__ == "__main__":
         print(args.actor_std,args.critic_std)
         train(args,path,run_name)
     else:
-        model_path = 'runs/all_1250/model.cleanrl_model'
+        model_path = 'runs/all_1139/model.cleanrl_model'
         test(args,model_path)
     
