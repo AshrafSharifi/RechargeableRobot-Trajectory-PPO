@@ -78,14 +78,17 @@ class variables:
                                node_color=['pink' if n == source_node else 'green' if n in [3, 5, 7] else 'lightgreen' for n in G.nodes])
     
         # Draw the edges with different colors for each direction
-        nx.draw_networkx_edges(G, self.pos, edgelist=[(u, v) for u, v in G.edges if self.graph_data['edges'][(u, v)] in [15, 20]],
-                               width=2, edge_color='red', arrowsize=20, connectionstyle="arc3")
+        nx.draw_networkx_edges(G, self.pos, edgelist=[(u, v) for u, v in G.edges if self.graph_data['edges'][(u, v)] in [15]],
+                               width=2, edge_color='green', arrowsize=20, connectionstyle="arc3")
     
         nx.draw_networkx_edges(G, self.pos, edgelist=[(u, v) for u, v in G.edges if self.graph_data['edges'][(u, v)] == 30],
                                width=2, edge_color='orange', arrowsize=20, connectionstyle="arc3")
     
         nx.draw_networkx_edges(G, self.pos, edgelist=[(u, v) for u, v in G.edges if self.graph_data['edges'][(u, v)] == 45],
                                width=2, edge_color='blue', arrowsize=20, connectionstyle="arc3")
+        
+        nx.draw_networkx_edges(G, self.pos, edgelist=[(u, v) for u, v in G.edges if self.graph_data['edges'][(u, v)] == 60],
+                               width=2, edge_color='red', arrowsize=20, connectionstyle="arc3")
     
         # Highlight the path
         if path:
