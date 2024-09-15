@@ -5,7 +5,7 @@
                 1,
                 2
             ],
-            "distance": 30
+            "distance": 45
         },
         "dis_to_charging_station": 15,
         "nearest_charging_station": 7,
@@ -56,7 +56,7 @@
                 2,
                 1
             ],
-            "distance": 30
+            "distance": 45
         },
         "dis_to_charging_station": 15,
         "nearest_charging_station": 3,
@@ -147,7 +147,7 @@
                 3,
                 7
             ],
-            "distance": 30
+            "distance": 45
         }
     },
     "4": {
@@ -176,14 +176,14 @@
                 4,
                 5
             ],
-            "distance": 30
+            "distance": 45
         },
         "6": {
             "path": [
                 4,
                 6
             ],
-            "distance": 30
+            "distance": 45
         },
         "7": {
             "path": [
@@ -233,14 +233,14 @@
                 5,
                 4
             ],
-            "distance": 30
+            "distance": 45
         },
         "6": {
             "path": [
                 5,
                 6
             ],
-            "distance": 30
+            "distance": 45
         },
         "7": {
             "path": [
@@ -276,14 +276,14 @@
                 6,
                 4
             ],
-            "distance": 30
+            "distance": 45
         },
         "5": {
             "path": [
                 6,
                 5
             ],
-            "distance": 30
+            "distance": 45
         },
         "7": {
             "path": [
@@ -326,7 +326,7 @@
                 7,
                 3
             ],
-            "distance": 30
+            "distance": 45
         },
         "4": {
             "path": [

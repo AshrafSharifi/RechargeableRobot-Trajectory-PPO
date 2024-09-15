@@ -18,11 +18,19 @@ from variables import variables
 @dataclass
 class Args:
     
+    reward_temperature_weight:float = 5 # Weight for maximizing temperature change
+    
+    reward_time_weight:float = .3  # Weight for minimizing time
+    
+    reward_charging_weight:float = .3
+    
     actor_std :float = 0.01
+    
     critic_std :float = .9
+    
     train_mode : bool = False
     
-    train_Forall : bool = False 
+    train_Forall : bool = False
     
     threshold_diff: int =1
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
@@ -172,43 +180,22 @@ class Agent(nn.Module):
     def get_value(self, x):
         return self.critic(x)
 
-    
 
-    def get_action_and_value__(self, x, action=None):
-        try:
-            # check_weights_for_nan(agent) 
-            if np.random.rand() <= self.epsilon:
-                action = torch.randint(1, 8, (1,)).item()
-                random_initial_steps -= 1
-                log_prob = torch.tensor(0.0)  # Set a default value for log probability
-                entropy = torch.tensor(0.0)  # Set a default value for entropy
-            else:
-                # check_weights_for_nan(agent) 
-                logits = self.actor(x)
-                if logits is None:
-                    print("Warning: self.actor(x) returned None.")
-                    return None, None, None, None
-        
-                probs = Categorical(logits=logits)
-                if action is None:
-                    action = probs.sample()+1
-                    while int(x[0, 0].item()) == action or action==0:
-                        action = probs.sample()+1
-            return action, probs.log_prob(action), probs.entropy(), self.critic(x)
     
-        except Exception as e:
-            print(f"Error: {e}")
-            return None, None, None, None
-    
-    def get_action_and_value(self, x, action=None):
+    def get_action_and_value(self, x, action=None,best_charging_station=None):
         try:
             logits = self.actor(x)
             if logits is None:
                 print("Warning: self.actor(x) returned None.")
                 return None, None, None, None
-        
+            
+            if best_charging_station != None:
+               logits[0][best_charging_station-1] = logits.max()+2
+                
             probs = Categorical(logits=logits)
             
+            
+                
             if action is None:
                 # Sample an action
                 action = probs.sample()
@@ -231,51 +218,8 @@ class Agent(nn.Module):
             return None, None, None, None
 
 
+    
 
-
-    # def get_action_and_value(self, x, action=None):
-    #     try:
-    #         # check_weights_for_nan(agent) 
-    #         logits = self.actor(x)
-    #         if logits is None:
-    #             print("Warning: self.actor(x) returned None.")
-    #             return None, None, None, None
-    
-    #         probs = Categorical(logits=logits)
-    #         if action is None:
-    #             action = probs.sample()
-    #             while int(x[0, 0].item()) == action+1 or action==0:
-    #                 action = probs.sample()
-    #         return action+1, probs.log_prob(action), probs.entropy(), self.critic(x)
-    
-    #     except Exception as e:
-    #         print(f"Error: {e}")
-    #         return None, None, None, None
-        
-        
-    # def get_action_and_value(self, x, action=None):
-    #     try:
-    #         logits = self.actor(x)
-    #         probs = F.softmax(logits, dim=-1)
-    
-    #         if action is None:
-    #             action = Categorical(probs=probs).sample() + 1  # Adding 1 to make the range 1 to 6
-    
-    #         if action.dim() == 0:
-    #             action = action.unsqueeze(0)  # Convert scalar to 1D tensor
-    
-    #         # Reshape logits to have two dimensions
-    #         logits_reshaped = logits.view(1, -1)
-    
-    #         log_prob = F.log_softmax(logits_reshaped, dim=1).gather(1, action.unsqueeze(1))
-    
-    #         entropy = -(probs * F.log_softmax(logits_reshaped, dim=1)).sum(-1)
-    
-    #         return action, log_prob, entropy, self.critic(x)
-    
-    #     except Exception as e:
-    #         print(f"Error: {e}")
-    #         return None, None, None, None
 
 
 def train(args=None,path=None,run_name=None,state_dict = None,train_for_all=False):
@@ -307,7 +251,7 @@ def train(args=None,path=None,run_name=None,state_dict = None,train_for_all=Fals
     torch.backends.cudnn.deterministic = args.torch_deterministic
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
-    envs = Environment(args.env_id)
+    envs = Environment(args.env_id,args.reward_temperature_weight,args.reward_time_weight,args.reward_charging_weight)
     agent = Agent(envs, args).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
        
@@ -366,7 +310,14 @@ def train(args=None,path=None,run_name=None,state_dict = None,train_for_all=Fals
             with torch.no_grad():
                 action = 0
                 while action == 0:
-                    action, logprob, _, value = agent.get_action_and_value(next_obs)
+                    bettery_level_temp = next_obs.detach().cpu()[0,6]
+                    dist_to_charging_station_temp = next_obs.detach().cpu()[0,7]
+                    best_charging_station = None
+                    if  bettery_level_temp <= 60 and dist_to_charging_station_temp!=0:
+                        # if next_obs[0][0]==4:
+                        #     print('ok')
+                        best_charging_station = envs.get_best_charging_station(next_obs,his_trajectory)
+                    action, logprob, _, value = agent.get_action_and_value(next_obs,None,best_charging_station)
 
                 values[step] = value.flatten()
             actions[step] = action
@@ -532,7 +483,7 @@ def test(args, model_path):
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
     
     # Initialize environment
-    envs = Environment(args.env_id)
+    envs = Environment(args.env_id,args.reward_temperature_weight,args.reward_time_weight,args.reward_charging_weight)
     envs.get_min_max_temp()
     state = envs.reset()
     state = np.array([state])
@@ -573,11 +524,12 @@ def test(args, model_path):
 
         s_path = varobj.shortest_paths_data[str(state[0][0])][str(next_state[0][0])]['path']
         battery_level = next_state[0][6]
+        dist_to_charging_station = next_state[0][7]
         date_time = varobj.extract_date_time(next_state)
-        varobj.plotgraph(s_path[0], s_path, battery_level, round(reward, 2), round(temperature_difference, 2),date_time)
+        varobj.plotgraph(s_path[0], s_path, battery_level, round(reward, 2), round(temperature_difference, 2),date_time,dist_to_charging_station)
         
         if Flag:
-            finish = True
+            # finish = True
             next_state[0][3] = next_state[0][3] + 1
         state = next_state
         
@@ -802,6 +754,6 @@ if __name__ == "__main__":
         print(args.actor_std,args.critic_std)
         train(args,path,run_name)
     else:
-        model_path = 'runs/all_1139/model.cleanrl_model'
+        model_path = 'runs/all_1238/model.cleanrl_model'
         test(args,model_path)
     

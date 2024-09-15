@@ -26,15 +26,28 @@ class variables:
         self.graph_data = {
             'nodes': [1, 2, 3, 4, 5, 6, 7],
             'edges': {
-                (1, 2): 30, (1, 3): 45, (1, 4): 60, (1, 5): 60, (1, 7): 15,
-                (2, 1): 30, (2, 3): 15, (2, 5): 60, (2, 6): 60, (2, 7): 45,
-                (3, 1): 45, (3, 2): 15, (3, 4): 15, (3, 5): 45, (3, 6): 45, (3, 7): 30,
-                (4, 1): 60, (4, 3): 15, (4, 5): 30, (4, 6): 30, (4, 7): 45,
-                (5, 1): 60, (5, 2): 60, (5, 3): 45, (5, 4): 30, (5, 6): 30, (5, 7): 45,
-                (6, 2): 60, (6, 3): 45, (6, 4): 30, (6, 5): 30, (6, 7): 15,
-                (7, 1): 15, (7, 2): 45, (7, 3): 30, (7, 4): 45, (7, 5): 45, (7, 6): 15
+                (1, 2): 45, (1, 3): 45, (1, 4): 60, (1, 5): 60, (1, 7): 15,
+                (2, 1): 45, (2, 3): 15, (2, 5): 60, (2, 6): 60, (2, 7): 45,
+                (3, 1): 45, (3, 2): 15, (3, 4): 15, (3, 5): 45, (3, 6): 45, (3, 7): 45,
+                (4, 1): 60, (4, 3): 15, (4, 5): 45, (4, 6): 45, (4, 7): 45,
+                (5, 1): 60, (5, 2): 60, (5, 3): 45, (5, 4): 45, (5, 6): 45, (5, 7): 45,
+                (6, 2): 60, (6, 3): 45, (6, 4): 45, (6, 5): 45, (6, 7): 15,
+                (7, 1): 15, (7, 2): 45, (7, 3): 45, (7, 4): 45, (7, 5): 45, (7, 6): 15
             }
         }
+        
+        # self.graph_data = {
+        #     'nodes': [1, 2, 3, 4, 5, 6, 7],
+        #     'edges': {
+        #         (1, 2): 15, (1, 3): 15, (1, 4): 60, (1, 5): 60, (1, 7): 45,
+        #         (2, 1): 15, (2, 3): 45, (2, 5): 60, (2, 6): 60, (2, 7): 15,
+        #         (3, 1): 15, (3, 2): 45, (3, 4): 45, (3, 5): 15, (3, 6): 15, (3, 7): 15,
+        #         (4, 1): 60, (4, 3): 45, (4, 5): 15, (4, 6): 15, (4, 7): 15,
+        #         (5, 1): 60, (5, 2): 60, (5, 3): 15, (5, 4): 15, (5, 6): 15, (5, 7): 15,
+        #         (6, 2): 60, (6, 3): 15, (6, 4): 15, (6, 5): 15, (6, 7): 45,
+        #         (7, 1): 45, (7, 2): 15, (7, 3): 15, (7, 4): 15, (7, 5): 15, (7, 6): 45
+        #     }
+        # }
         
         # Define the charging stations
         self.charging_stations = [5,7,3]
@@ -59,7 +72,7 @@ class variables:
         return formatted_date_time
 
 
-    def plotgraph(self, source_node=0, path=None, battery_level=None, reward=None, temperature_difference=None, time=None):
+    def plotgraph(self, source_node=0, path=None, battery_level=None, reward=None, temperature_difference=None, time=None, dist_to_charging_station=None):
         # Create a directed graph to reflect the bidirectional nature
         G = nx.DiGraph()
     
@@ -100,11 +113,13 @@ class variables:
             end_node = path[-1]
             
             # Define a color based on the battery level
-            if battery_level > 150:
+            if battery_level == 300:
+                box_color = 'green'
+            elif 150 <= battery_level < 300:
                 box_color = 'lightgreen'
-            elif 70 < battery_level < 150:
-                box_color = 'yellow'
             else:
+                box_color = 'yellow'
+            if battery_level <= dist_to_charging_station:
                 box_color = 'red'
             
             annotation_text = f"{time}\n-------------------------\nBattery: {battery_level}\nReward: {reward}\nTemp Diff: {temperature_difference}"
