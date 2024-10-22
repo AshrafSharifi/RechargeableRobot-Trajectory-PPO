@@ -20,20 +20,6 @@
             ],
             "distance": 45
         },
-        "4": {
-            "path": [
-                1,
-                4
-            ],
-            "distance": 60
-        },
-        "5": {
-            "path": [
-                1,
-                5
-            ],
-            "distance": 60
-        },
         "7": {
             "path": [
                 1,
@@ -41,13 +27,30 @@
             ],
             "distance": 15
         },
+        "4": {
+            "path": [
+                1,
+                7,
+                4
+            ],
+            "distance": 30
+        },
+        "5": {
+            "path": [
+                1,
+                7,
+                5
+            ],
+            "distance": 30
+        },
         "6": {
             "path": [
                 1,
                 7,
+                5,
                 6
             ],
-            "distance": 30
+            "distance": 45
         }
     },
     "2": {
@@ -58,7 +61,7 @@
             ],
             "distance": 45
         },
-        "dis_to_charging_station": 15,
+        "dis_to_charging_station": 45,
         "nearest_charging_station": 3,
         "path_to_charging_station": [
             2,
@@ -69,21 +72,7 @@
                 2,
                 3
             ],
-            "distance": 15
-        },
-        "5": {
-            "path": [
-                2,
-                5
-            ],
-            "distance": 60
-        },
-        "6": {
-            "path": [
-                2,
-                6
-            ],
-            "distance": 60
+            "distance": 45
         },
         "7": {
             "path": [
@@ -95,10 +84,27 @@
         "4": {
             "path": [
                 2,
-                3,
+                7,
                 4
             ],
-            "distance": 30
+            "distance": 60
+        },
+        "5": {
+            "path": [
+                2,
+                3,
+                5
+            ],
+            "distance": 60
+        },
+        "6": {
+            "path": [
+                2,
+                3,
+                5,
+                6
+            ],
+            "distance": 75
         }
     },
     "3": {
@@ -119,186 +125,200 @@
                 3,
                 2
             ],
-            "distance": 15
+            "distance": 45
         },
         "4": {
             "path": [
                 3,
+                5,
                 4
             ],
-            "distance": 15
+            "distance": 30
         },
         "5": {
             "path": [
                 3,
                 5
             ],
-            "distance": 45
-        },
-        "6": {
-            "path": [
-                3,
-                6
-            ],
-            "distance": 45
-        },
-        "7": {
-            "path": [
-                3,
-                7
-            ],
-            "distance": 45
-        }
-    },
-    "4": {
-        "1": {
-            "path": [
-                4,
-                1
-            ],
-            "distance": 60
-        },
-        "dis_to_charging_station": 15,
-        "nearest_charging_station": 3,
-        "path_to_charging_station": [
-            4,
-            3
-        ],
-        "3": {
-            "path": [
-                4,
-                3
-            ],
             "distance": 15
         },
-        "5": {
-            "path": [
-                4,
-                5
-            ],
-            "distance": 45
-        },
         "6": {
             "path": [
-                4,
+                3,
+                5,
                 6
             ],
-            "distance": 45
+            "distance": 30
         },
         "7": {
             "path": [
-                4,
-                7
-            ],
-            "distance": 45
-        },
-        "2": {
-            "path": [
-                4,
                 3,
-                2
+                5,
+                7
             ],
             "distance": 30
         }
     },
-    "5": {
+    "4": {
+        "3": {
+            "path": [
+                4,
+                5,
+                3
+            ],
+            "distance": 30
+        },
+        "dis_to_charging_station": 15,
+        "nearest_charging_station": 5,
+        "path_to_charging_station": [
+            4,
+            5
+        ],
+        "5": {
+            "path": [
+                4,
+                5
+            ],
+            "distance": 15
+        },
+        "6": {
+            "path": [
+                4,
+                5,
+                6
+            ],
+            "distance": 30
+        },
+        "7": {
+            "path": [
+                4,
+                7
+            ],
+            "distance": 15
+        },
         "1": {
             "path": [
-                5,
+                4,
+                7,
                 1
             ],
+            "distance": 30
+        },
+        "2": {
+            "path": [
+                4,
+                7,
+                2
+            ],
             "distance": 60
+        }
+    },
+    "5": {
+        "3": {
+            "path": [
+                5,
+                3
+            ],
+            "distance": 15
         },
         "dis_to_charging_station": 0,
         "nearest_charging_station": 5,
         "path_to_charging_station": [
             5
         ],
-        "2": {
-            "path": [
-                5,
-                2
-            ],
-            "distance": 60
-        },
-        "3": {
-            "path": [
-                5,
-                3
-            ],
-            "distance": 45
-        },
         "4": {
             "path": [
                 5,
                 4
             ],
-            "distance": 45
+            "distance": 15
         },
         "6": {
             "path": [
                 5,
                 6
             ],
-            "distance": 45
+            "distance": 15
         },
         "7": {
             "path": [
                 5,
                 7
             ],
-            "distance": 45
-        }
-    },
-    "6": {
+            "distance": 15
+        },
+        "1": {
+            "path": [
+                5,
+                7,
+                1
+            ],
+            "distance": 30
+        },
         "2": {
             "path": [
-                6,
+                5,
+                3,
                 2
             ],
             "distance": 60
-        },
-        "dis_to_charging_station": 15,
-        "nearest_charging_station": 7,
-        "path_to_charging_station": [
-            6,
-            7
-        ],
+        }
+    },
+    "6": {
         "3": {
             "path": [
                 6,
+                5,
                 3
             ],
-            "distance": 45
+            "distance": 30
         },
+        "dis_to_charging_station": 15,
+        "nearest_charging_station": 5,
+        "path_to_charging_station": [
+            6,
+            5
+        ],
         "4": {
             "path": [
                 6,
+                5,
                 4
             ],
-            "distance": 45
+            "distance": 30
         },
         "5": {
             "path": [
                 6,
                 5
             ],
-            "distance": 45
+            "distance": 15
         },
         "7": {
             "path": [
                 6,
+                5,
                 7
             ],
-            "distance": 15
+            "distance": 30
         },
         "1": {
             "path": [
                 6,
+                5,
                 7,
                 1
             ],
-            "distance": 30
+            "distance": 45
+        },
+        "2": {
+            "path": [
+                6,
+                5,
+                3,
+                2
+            ],
+            "distance": 75
         }
     },
     "7": {
@@ -324,30 +344,32 @@
         "3": {
             "path": [
                 7,
+                5,
                 3
             ],
-            "distance": 45
+            "distance": 30
         },
         "4": {
             "path": [
                 7,
                 4
             ],
-            "distance": 45
+            "distance": 15
         },
         "5": {
             "path": [
                 7,
                 5
             ],
-            "distance": 45
+            "distance": 15
         },
         "6": {
             "path": [
                 7,
+                5,
                 6
             ],
-            "distance": 15
+            "distance": 30
         }
     }
 }

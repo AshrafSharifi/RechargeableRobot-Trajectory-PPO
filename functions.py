@@ -181,6 +181,18 @@ class functions(object):
 
      return hours, minutes
   
+  def change_minutes(self,date_str, minutes_to_decrease):
+       # Convert the string to a datetime object
+      date_obj = datetime.strptime(date_str, '%Y-%m-%d %H:%M')
+        
+       # Decrease the specified number of minutes
+      updated_date_obj = date_obj + timedelta(minutes=minutes_to_decrease)
+        
+       # Convert the datetime object back to the input format
+      updated_date_str = updated_date_obj.strftime('%Y-%m-%d %H:%M')
+        
+      return updated_date_str
+    
   def add_minutes(self, base_time, minutes_to_add):
       
       flag= False
@@ -207,39 +219,12 @@ class functions(object):
 
       return hours, minutes, flag
     
-    
-  # def time_to_reach_POI(self):
-      
-  #     reach_time = dict()
-  #     S1 = {'1_2': 15, '1_3': 90, '1_4': 30, '1_5': 75, '1_6': 45, '1_7': 60}
-  #     reach_time['sensor1']= S1;
-      
-  #     S2 = {'2_1': 90, '2_3': 75, '2_4': 15 ,'2_5': 60, '2_6': 30, '2_7': 45}
-  #     reach_time['sensor2']= S2;
-       
-  #     S3 = {'3_1': 15, '3_2': 30, '3_4':45  ,'3_5':90 , '3_6':60 , '3_7':75 }
-  #     reach_time['sensor3']= S3;
-      
-  #     S4 = {'4_1':75 , '4_2':90 , '4_3':60  ,'4_5':45 , '4_6':15 , '4_7':30 }
-  #     reach_time['sensor4']= S4;
-      
-  #     S5 = {'5_1':30 , '5_2':45 , '5_3':15  ,'5_4':60 , '5_6':75 , '5_7':90 }
-  #     reach_time['sensor5']= S5;
-      
-  #     S6 = {'6_1':60 ,'6_2':75 , '6_3':45 , '6_4':90  ,'6_5':30 , '6_7':15 }
-  #     reach_time['sensor6']= S6
-      
-  #     S7 = {'7_1': 45, '7_2':60 , '7_3':30  ,'7_4': 75, '7_5':15 , '7_6':90 }
-  #     reach_time['sensor7']= S7;
-     
-  #     return reach_time;
-  
   def get_all_data(self):
         
         sensorList = list(range(1,9))
         output = dict()
         for sensor in sensorList:
-            fin_name = 'data/aggregated_data' + str(sensor)
+            fin_name = 'data/Sensor_data/aggregated_data' + str(sensor)
             with open(fin_name, 'rb') as fin:
                 aggregated_data = pickle.load(fin)
                 output["sensor" + str(sensor)] = aggregated_data

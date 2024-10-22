@@ -10,7 +10,7 @@ from keras.layers import BatchNormalization
 from variables import variables
 
 class Environment:
-    def __init__(self , env_id,reward_temperature_weight,reward_time_weight,reward_charging_weight):
+    def __init__(self , env_id,reward_temperature_weight,reward_time_weight,reward_charging_weight,var_obj):
         # [3,1,1]
         # [5,.3,.3]
         self.env_id : int  = 0
@@ -42,15 +42,27 @@ class Environment:
         data = self.func.get_all_data()
         self.sensorsdata= data
         self.reach_time_minutes = 0
-        self.var_obj = variables()
+        self.var_obj = var_obj
    
-    def get_previous_key(self,circular_dict, current_key):
-        keys = list(circular_dict.keys())
-        index = keys.index(current_key)
-        previous_index = (index - 1) % len(keys)
-        previous_key = keys[previous_index]
-        return previous_key
-        
+
+    
+    def get_random_state(self,state_dict):
+        next_obs = [0] * 8
+        next_obs[0] =random.choice(range(1,8))
+        keys = list(state_dict.keys())
+        random_key = random.choice(keys)
+        [y,m] = random_key.split('_')
+        next_obs[1]=int(y)
+        next_obs[2]=int(m)
+        next_obs[3] = random.choice(state_dict[random_key])
+        random_hour = random.randint(0, 23)
+        random_min = random.choice([0, 15, 30, 45])
+        next_obs[4] = random_hour
+        next_obs[5] = random_min
+        next_obs[6] = self.var_obj.initialChargingLevel
+        next_obs[7] = self.var_obj.shortest_paths_data[str(next_obs[0])]['dis_to_charging_station']
+        return next_obs
+    
     def reset(self):
  
         key = list(self.states_dict.keys())[0]
@@ -70,36 +82,9 @@ class Environment:
         # self.mean_temp = temp_info['mean_temp']
         # self.std_temp = temp_info['std_temp']
         
-    def find_next_item(self,num):
-        
-        # Find the index of the given number in the array
-        try:
-            index = self.POIs.index(num)
-        except ValueError:
-            print(f"The number {num} is not in the array.")
-            return None
 
-        # Calculate the index of the next number in the circular array
-        next_index = (index + 1) % len(arr)
-
-        # Return the next number
-        return arr[next_index] 
     
-    def act(self, state):
-        if np.random.rand() <= self.epsilon:
-            action = random.randrange(0, self.action_dim-1)
-            return action+1
-        else:
-            # while True:
-            temp = self.model.predict(state)[0]
-            action = np.argmax(temp)
-            return action+1
-                # if action != state[0,0] and action != 0:
-                #     return action
-                # else:
-                #     while True:
-                #         action = random.randrange(1, self.action_dim)
-                #         return action             
+               
     
     def compute_reach_time(self,current_sensor, next_sensor):
         reach_time_data = self.reach_time["sensor"+str(current_sensor)]
@@ -158,7 +143,10 @@ class Environment:
     
         his_trajectory,_ = self.update_his_trajectory(state, his_trajectory)
         
-        new_state = self.add_process_time(new_state,self.process_time)
+        time_offset = self.process_time
+        if new_state[6] == self.var_obj.initialChargingLevel:
+            time_offset *= 2
+        new_state = self.add_process_time(new_state,time_offset)
         return new_state, Flag,reward,temperature_difference,reach_time_minutes,his_trajectory
     
     def add_process_time(self,state,added_min):
@@ -354,54 +342,7 @@ class Environment:
         # Return the next number
         return self.POIs[next_index]  
     
-    def print_traj(self,path,print_flag=True,his_trajectory=None):
-        
-        # passedkeys = {key:value[1] for key, value in path.items() if value[0] == 'Passed'}
-        # list_of_tuples = [(key, value) for key, value in passedkeys.items()]
-
-        # # Sort the list of tuples based on the values
-        # sorted_list = sorted(list_of_tuples, key=lambda x: x[1])
-        
-        # while any(self.has_shape_zero(value) for value in path.values() if value[0]!= 'NotVisited'):
-        #     for (key, val) in sorted_list:
-        #         while path[key][5].shape == (0, 0):
-        #             previouskey_list = self.get_previous_key(path, key)
-                    
-        #             if not previouskey_list:
-        #                 break  # Break the loop if there is no valid previous key
-            
-        #             previouskey = previouskey_list[0]
-            
-        #             if path[previouskey][5].shape != (0, 0):
-        #                 pre_state = np.reshape(path[previouskey][5], [1, self.state_dim]) 
-        #                 base_time = str(pre_state[0, 4]) + ':' + str(pre_state[0, 5]) + ':00'
-        #                 next_hour, next_min, Flag = self.func.add_minutes(base_time, 15)
-        #                 state = np.array([int(key), int(pre_state[0, 1]), int(pre_state[0, 2]), int(pre_state[0, 3]), next_hour, next_min])
-        #                 path[key][5] = np.reshape(state, [1, self.state_dim])
-            
-        #             key = previouskey
-
-        
-        headers = ["POI", "Status", "Priority", "Reward", "T_differ", "Reach_time", "State","temp"]
-        table = []
-        for key, values in path.items():
-            if values[0] != 'NotVisited':
-                table.append([key, *values])
-                
-        table = sorted(table, key=lambda x: (x[6][0][3],x[6][0][4], x[6][0][5]))
-        # table = self.refine_time(table)
-        
-        table = sorted(table, key=lambda x: (x[6][0][3],x[6][0][4], x[6][0][5]))
-        for entry in table:
-            if entry[1] != 'NotVisited':
-                path_key = entry[1]  # Assuming entry[0] is the key in the path dictionary
-                entry[7] = self.get_current_temp(entry[6][0])
-        
-        table =self.add_prev_temp(table,his_trajectory)
-        if print_flag:
-         
-            print(tabulate(table, headers, tablefmt="pretty"))
-        return table
+    
     
     def has_shape_zero(self,value):
         return value[5].shape == (0, 0)
@@ -445,3 +386,45 @@ class Environment:
                 
             
         return table
+    
+    def create_train_db(self,complete_paths):
+        
+        climatic_data = dict()
+        for sensor in range(1,8):
+            temp_data =  self.sensorsdata["sensor"+str(sensor)]
+            temp_data = [value for value in temp_data.values()][0]
+            first_element = next(iter(temp_data.items()))
+            climatic_data[sensor] = first_element[1]['sensorData']
+        
+        
+        df_train =  pd.DataFrame(columns=list(climatic_data[1].columns) + ['sensor'])
+        for item in complete_paths.values():
+            
+            
+            
+            
+            indx = localize_row(climatic_data[item[0]],state)
+            # df.loc[indx,'status'] = item[0]
+            # df.to_csv(csv_file, index=False, encoding='utf-8')
+            # if item[0]=='Visited':
+                
+            # df_train.loc[len(df_train)] = list(df.iloc[indx]) + [str(sensor)]
+            
+    def localize_row(df,state):
+     
+     all_conditions = (df['hour'] == state[4]) & (df['month'] == state[2]) & (df['day_of_month'] == state[3])
+     # Check the value of A and select the corresponding row
+     if state[5] == 0:
+         condition = (df['complete_timestamp(YYYY_M_DD_HH_M)'].str[-1] == '0')
+     elif state[5] == 15:
+         condition = (df['complete_timestamp(YYYY_M_DD_HH_M)'].str[-1] == '1')
+     elif state[5] == 30:
+         condition = (df['complete_timestamp(YYYY_M_DD_HH_M)'].str[-1] == '2')
+     elif state[5] == 45:
+         condition = (df['complete_timestamp(YYYY_M_DD_HH_M)'].str[-1] == '3')
+     
+     indx = (df[all_conditions & condition].index)
+     if indx.size == 1:
+         return indx[0]
+     else:
+         return -1
