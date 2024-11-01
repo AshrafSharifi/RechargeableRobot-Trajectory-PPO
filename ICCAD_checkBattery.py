@@ -51,7 +51,7 @@ data_header = [
     'year', 'month', 'week', 'day_of_year', 'day_of_month', 'day_of_week',
     'hour'
 ]
-DB_file = "data/ICCAD/train_DB.csv"
+DB_file = "data/DB/Baseline/train_DB.csv"
 
 df = pd.read_csv(DB_file)
 df = df[data_header].values
@@ -80,4 +80,5 @@ for i, (index, row) in enumerate(df.iterrows()):
 print(counter)
 print(all_counter)
     
+
     
